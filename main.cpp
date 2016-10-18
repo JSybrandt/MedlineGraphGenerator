@@ -268,8 +268,9 @@ int main(int argc, char** argv) {
         for (Vec& v : wordVecs) {
                 vec += v;
         }
-        vec /= (float)wordVecs.size();
-#pragma omp critical (SET_PMID)
+        if(wordVecs.size() > 0)
+            vec /= (float)wordVecs.size();
+#pragma omp critical (SET_PMID_VEC)
         pmid2vec[pmid] = vec;
     }
     
