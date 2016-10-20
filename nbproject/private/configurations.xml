@@ -35,6 +35,7 @@
         <remove-instrumentation>0</remove-instrumentation>
         <environment>
           <variable name="OMP_NUM_THREADS" value="8"/>
+          <variable name="OMP_THREAD_LIMIT" value="16"/>
         </environment>
       </runprofile>
     </conf>

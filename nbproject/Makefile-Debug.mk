@@ -36,6 +36,7 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 # Object Files
 OBJECTFILES= \
 	${OBJECTDIR}/Abstract.o \
+	${OBJECTDIR}/Canonicalizer.o \
 	${OBJECTDIR}/Dict.o \
 	${OBJECTDIR}/Vec.o \
 	${OBJECTDIR}/main.o
@@ -69,6 +70,11 @@ ${OBJECTDIR}/Abstract.o: Abstract.cpp
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.cc) -g -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Abstract.o Abstract.cpp
+
+${OBJECTDIR}/Canonicalizer.o: Canonicalizer.cpp
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.cc) -g -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/Canonicalizer.o Canonicalizer.cpp
 
 ${OBJECTDIR}/Dict.o: Dict.cpp
 	${MKDIR} -p ${OBJECTDIR}

@@ -14,15 +14,25 @@
 #include"Abstract.h"
 #include"Dict.h"
 #include"Vec.h"
+#include"Canonicalizer.h"
 
 #include <flann/flann.hpp>
 using namespace std;
 
-const string MEDLINE_XML_DIR = "/scratch2/jsybran/medline"; 
-const string TEMP_DIR = "/scratch2/jsybran/tmp";
-const string CANON_FILE = "/scratch2/jsybran/results/canon";
-const string VECTOR_FILE = "/scratch2/jsybran/results/canon.vec";
-const string OUTPUT_FILE = "/scratch2/jsybran/results/graph.edges";
+//RELEASE
+//const string HOME_DIR = "/scratch2/jsybran";
+
+//DEBUG
+const string HOME_DIR = "/home/jsybran/Projects/Data";
+
+const string MEDLINE_XML_DIR = HOME_DIR + "/medline"; 
+const string RESULTS_DIR = HOME_DIR + "/results";
+const string CANON_FILE = RESULTS_DIR + "/canon";
+const string VECTOR_FILE = RESULTS_DIR + "/canon.vec";
+const string OUTPUT_FILE = RESULTS_DIR + "/graph.edges";
+const string LOG_FILE = HOME_DIR + "/log.txt";
+
+
 const string LVG_COMMAND = "lvg -f:0:C:P:q0:q1:q2:rs:g:T:t:u | awk 'BEGIN{FS=\"|\"}{print $2}'";
 const string FASTTEXT_COMMAND = "fasttext skipgram -dim 500 -ws 8 -maxn 8 -thread 12 -input " + CANON_FILE + " -output " + CANON_FILE;
 const string ABSTRACT_REGEX = "\\</?AbstractText.*?\\>";
@@ -69,7 +79,8 @@ vector<string> getFilesInDir(string dirPath){
 }
 
 //Returns PMID, AbstractText pairs
-unordered_map<string,string> parseXML(string fileName){
+unordered_map<string,string> parseXML(string fileName, fstream& resOut){
+    Canonicalizer canonMaker;
     unordered_map<string,string> pmid2abstract;
     regex abstractRegex(ABSTRACT_REGEX,regex_constants::ECMAScript);
     regex pmidRegex(PMID_REGEX,regex_constants::ECMAScript);
@@ -82,7 +93,9 @@ unordered_map<string,string> parseXML(string fileName){
         if(regex_search(line,pmidRegex)){
             lastFoundAbstract = trim(lastFoundAbstract);
             if(lastFoundPMID != "NULL" && lastFoundAbstract != ""){
-                pmid2abstract[lastFoundPMID] = lastFoundAbstract;
+                string canon = canonMaker.getCanon(lastFoundAbstract);
+                pmid2abstract[lastFoundPMID] = canon;
+                resOut<<lastFoundPMID<< " " << canon << endl;
             }
             lastFoundPMID = regex_replace(line,pmidRegex,"");
             lastFoundAbstract = "";
@@ -100,56 +113,21 @@ unordered_map<string,string> parseXML(string fileName){
 }
 
 void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
-#pragma omp parallel  
-    for(string xmlFile : getFilesInDir(dirPath)){
-        unordered_map<string,string> tmp = parseXML(xmlFile);
+    vector<string> xmlPaths = getFilesInDir(dirPath);
+#pragma omp parallel  for
+    for(int i = 0 ; i < xmlPaths.size();i++){
+        fstream resOut(RESULTS_DIR+"/res"+to_string(i),ios::out);
+        unordered_map<string,string> tmp = parseXML(xmlPaths[i], resOut);
+        resOut.close();
 #pragma omp critical (INSERT_ABSTRACT)
         pmid2abstract.insert(tmp.begin(),tmp.end());
     }
 }
 
-string generateTempFile(){
-    static unsigned int tempFileNum = 0;
-    tempFileNum++;
-    string tempFile = TEMP_DIR + "/" + to_string(tempFileNum) + ".txt";
-    system(("exec rm -f " + tempFile).c_str());
-    return tempFile; 
-}
-
-vector<string> bashAbstract2Canon(vector<string> abstracts, string tempFile){
-    vector<string> res;
-    stringstream s;
-    for(string l : abstracts)
-        s << l << endl;
-    FILE * command;
-    command = popen((LVG_COMMAND + " > " + tempFile).c_str(),"w");
-    if(command){
-        fprintf(command,"%s",s.str().c_str());
-        fflush(command);
-        pclose(command);
-#pragma omp critical (READING_FROM_TEMP)
-{
-        fstream read(tempFile,ios::in);
-        string tmp;
-        while(getline(read,tmp)){
-            res.push_back(tmp);
-        }
-}
-    }else{
-        cerr << "Could not run " << LVG_COMMAND << endl;
-    }
-#pragma omp critical (CLEAN_UP_TEMP)
-    system(("exec rm -f " + tempFile).c_str());
-    return res;
-}
-
-
 void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string outputFilePath){
     //row major order, map.size() rows and VECTOR_SIZE cols
     float * vecData = new float[pmid2vec.size()*VECTOR_SIZE];
     
-    
-    //cout<<"Fill Array" << endl;
     int pmidCount = 0;
     for(string pmid : pmids){
         for(int i = 0 ; i < VECTOR_SIZE; i++){
@@ -157,12 +135,9 @@ void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string
         }
         pmidCount++;
     }
-    
-    //cout<<"Make FLANN Array" << endl;
-    
+        
     flann::Matrix<float> data(vecData,pmid2vec.size(),VECTOR_SIZE);
       
-    //cout << "Make Index" << endl; 
     flann::Index<flann::L2<float> > index(data, flann::KDTreeIndexParams(16));
     index.buildIndex();
     
@@ -191,63 +166,45 @@ void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string
 }
 
 int main(int argc, char** argv) {
-     
-    cout<<"Started"<<endl;
 
-    fstream canonOut(CANON_FILE,ios::out);
-       
+    fstream lout(LOG_FILE,ios::out);
+    lout<<"Started"<<endl;
+    
+ # pragma omp parallel
+{
+    lout<<"Thread rank: "<< omp_get_thread_num() << endl;
+}
+
     unordered_map<string,string> pmid2abstract;
     
-    cout<<"Parsing MEDLINE XML"<<endl;
+    lout<<"Parsing MEDLINE XML"<<endl;
     parseMedline(pmid2abstract,MEDLINE_XML_DIR);
     
-    cout<<"Found " << pmid2abstract.size() << " abstracts"<<endl;
+    lout<<"Found " << pmid2abstract.size() << " abstracts"<<endl;
     
     vector<string> pmids;
     for(auto val : pmid2abstract){
         pmids.push_back(val.first);
     }
     
-    cout<<"Canonicalizing"<<endl;
-#pragma omp parallel for
-    for(int index = 0 ; index < pmids.size();index+=CANON_BASH_SIZE){
-        
-        vector<string> batchPmid;
-        vector<string> batchAbstract;
-        int maxIndex = index + CANON_BASH_SIZE;
-        if(maxIndex > pmids.size()) maxIndex = pmids.size();
-        for(int i = index; i < maxIndex; i++){
-            batchPmid.push_back(pmids[i]);
-            batchAbstract.push_back(pmid2abstract[pmids[i]]);
-        }
-        string tempFile;
-#pragma omp critical (GET_TEMP)
-        tempFile = generateTempFile();
-        
-        vector<string> batchCanon = bashAbstract2Canon(batchAbstract,tempFile);
-       
-#pragma omp critical (WRITE)
-    {
-        for(int i = index; i < maxIndex; i++){
-            pmid2abstract[pmids[i]] = batchCanon[i-index];
-            canonOut << batchCanon[i-index] << endl;
-        }
-    }
-
+    fstream canonOut(CANON_FILE,ios::out);
+    
+    for(auto val : pmid2abstract){
+        canonOut << val.second<<endl;
     }
     
     canonOut.close();
     
-    cout<<"Training Fast Text"<<endl;
-    cout<<"Running " << FASTTEXT_COMMAND << endl;
+    lout<<"Training Fast Text"<<endl;
+    lout<<"Running " << FASTTEXT_COMMAND << endl;
     system(FASTTEXT_COMMAND.c_str());
     
-    cout<<"Building Dict"<<endl;
+    lout<<"Building Dict"<<endl;
     Dict dict(VECTOR_FILE);
     
     unordered_map<string,Vec> pmid2vec;
     
-    cout<<"Getting vectors per abstract"<<endl;
+    lout<<"Getting vectors per abstract"<<endl;
 #pragma omp parallel for
     for(int i = 0 ; i < pmids.size();i++){
         string pmid = pmids[i];
@@ -270,11 +227,12 @@ int main(int argc, char** argv) {
         pmid2vec[pmid] = vec;
     }
     
-    cout<<"Running FLANN"<<endl;
+    lout<<"Running FLANN"<<endl;
     runFlann(pmid2vec,pmids, OUTPUT_FILE);
     
-    cout << "DONE!" << endl;
+    lout << "DONE!" << endl;
 
+    lout.close();
     return 0;
 }
 
