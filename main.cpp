@@ -18,11 +18,11 @@
 #include <flann/flann.hpp>
 using namespace std;
 
-const string MEDLINE_XML_DIR = "/home/jsybran/Projects/Data/medline-test"; 
-const string TEMP_DIR = "/tmp/medline";
-const string CANON_FILE = TEMP_DIR + "/canon";
-const string VECTOR_FILE = TEMP_DIR + "/canon.vec";
-const string OUTPUT_FILE = TEMP_DIR + "/graph.edges";
+const string MEDLINE_XML_DIR = "/scratch2/jsybran/medline"; 
+const string TEMP_DIR = "/scratch2/jsybran/tmp";
+const string CANON_FILE = "/scratch2/jsybran/results/canon";
+const string VECTOR_FILE = "/scratch2/jsybran/results/canon.vec";
+const string OUTPUT_FILE = "/scratch2/jsybran/results/graph.edges";
 const string LVG_COMMAND = "lvg -f:0:C:P:q0:q1:q2:rs:g:T:t:u | awk 'BEGIN{FS=\"|\"}{print $2}'";
 const string FASTTEXT_COMMAND = "fasttext skipgram -dim 500 -ws 8 -maxn 8 -thread 12 -input " + CANON_FILE + " -output " + CANON_FILE;
 const string ABSTRACT_REGEX = "\\</?AbstractText.*?\\>";
@@ -194,10 +194,6 @@ int main(int argc, char** argv) {
      
     cout<<"Started"<<endl;
 
-    //clean out temp
-    system(("exec mkdir -p " + TEMP_DIR).c_str());
-    system(("exec rm -rf "+TEMP_DIR+"/*").c_str());
-    
     fstream canonOut(CANON_FILE,ios::out);
        
     unordered_map<string,string> pmid2abstract;
