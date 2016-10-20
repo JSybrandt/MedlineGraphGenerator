@@ -19,7 +19,7 @@ using namespace std;
 #define WRITE_END 1
 
 Canonicalizer::Canonicalizer() {
-    startProcess();
+    
 }
 
 Canonicalizer::Canonicalizer(const Canonicalizer& orig) {
@@ -31,7 +31,7 @@ Canonicalizer::~Canonicalizer() {
 }
 
 string Canonicalizer::getCanon(string input){
-    
+    startProcess();
     char buffer[64];
     int bufferSize = sizeof(buffer);
     
@@ -56,7 +56,7 @@ string Canonicalizer::getCanon(string input){
     close(returnPipe[READ_END]);
     
     startProcess();
-    return res;            
+    return res;
 }
 
 void Canonicalizer::startProcess(){

@@ -79,9 +79,9 @@ vector<string> getFilesInDir(string dirPath){
 }
 
 //Returns PMID, AbstractText pairs
-unordered_map<string,string> parseXML(string fileName, fstream& resOut){
-    Canonicalizer canonMaker;
-    unordered_map<string,string> pmid2abstract;
+map<string,string> parseXML(string fileName){
+    
+    map<string,string> pmid2abstract;
     regex abstractRegex(ABSTRACT_REGEX,regex_constants::ECMAScript);
     regex pmidRegex(PMID_REGEX,regex_constants::ECMAScript);
     fstream fin(fileName, ios::in);
@@ -93,9 +93,7 @@ unordered_map<string,string> parseXML(string fileName, fstream& resOut){
         if(regex_search(line,pmidRegex)){
             lastFoundAbstract = trim(lastFoundAbstract);
             if(lastFoundPMID != "NULL" && lastFoundAbstract != ""){
-                string canon = canonMaker.getCanon(lastFoundAbstract);
-                pmid2abstract[lastFoundPMID] = canon;
-                resOut<<lastFoundPMID<< " " << canon << endl;
+                pmid2abstract[lastFoundPMID] = lastFoundAbstract;
             }
             lastFoundPMID = regex_replace(line,pmidRegex,"");
             lastFoundAbstract = "";
@@ -112,13 +110,47 @@ unordered_map<string,string> parseXML(string fileName, fstream& resOut){
     return pmid2abstract;
 }
 
+void outputBash(vector<string> & tmpPmids, string output,fstream& fout){
+    Canonicalizer canonMaker;
+    stringstream r;
+    r << canonMaker.getCanon(output);
+
+    for(string pmid: tmpPmids){
+        string t;
+        getline(r,t);
+        fout << pmid << " " << t <<endl;
+    }
+    tmpPmids.clear();
+}
+
 void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
     vector<string> xmlPaths = getFilesInDir(dirPath);
 #pragma omp parallel  for
     for(int i = 0 ; i < xmlPaths.size();i++){
+        
+        map<string,string> tmp = parseXML(xmlPaths[i]);
+                
+        stringstream s;
+        int BASH_SIZE = 50;
+        
+        vector<string> tmpPmids;
         fstream resOut(RESULTS_DIR+"/res"+to_string(i),ios::out);
-        unordered_map<string,string> tmp = parseXML(xmlPaths[i], resOut);
+    
+        for(auto&val : tmp){
+            s << val.second << endl;
+            tmpPmids.push_back(val.first);
+            
+            if(tmpPmids.size() >= BASH_SIZE){
+                outputBash(tmpPmids,s.str(),resOut);
+
+                s.str( std::string() );
+                s.clear();
+                tmpPmids.clear();
+            }
+        }
+        outputBash(tmpPmids,s.str(),resOut);
         resOut.close();
+        
 #pragma omp critical (INSERT_ABSTRACT)
         pmid2abstract.insert(tmp.begin(),tmp.end());
     }
@@ -170,11 +202,6 @@ int main(int argc, char** argv) {
     fstream lout(LOG_FILE,ios::out);
     lout<<"Started"<<endl;
     
- # pragma omp parallel
-{
-    lout<<"Thread rank: "<< omp_get_thread_num() << endl;
-}
-
     unordered_map<string,string> pmid2abstract;
     
     lout<<"Parsing MEDLINE XML"<<endl;
