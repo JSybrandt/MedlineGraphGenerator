@@ -26,8 +26,6 @@ Canonicalizer::Canonicalizer(const Canonicalizer& orig) {
 }
 
 Canonicalizer::~Canonicalizer() {
-    close(lvgPipe[WRITE_END]);
-    close(returnPipe[READ_END]);
 }
 
 string Canonicalizer::getCanon(string input){
@@ -55,7 +53,6 @@ string Canonicalizer::getCanon(string input){
     }
     close(returnPipe[READ_END]);
     
-    startProcess();
     return res;
 }
 
@@ -79,7 +76,7 @@ void Canonicalizer::startProcess(){
         close(returnPipe[READ_END]);
         dup2(returnPipe[WRITE_END],STDOUT_FILENO);
         
-        execlp(LVG_COMMAND,NULL);
+        execlp(LVG_COMMAND.c_str(),NULL);
     }    
     //parent
     else{

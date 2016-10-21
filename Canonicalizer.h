@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <iostream>
 #include <string>
+#include "constants.h"
 
 using std::string;
 
@@ -21,7 +22,7 @@ private:
     int lvgPipe[2];
     int returnPipe[2];
     pid_t lvgPID;
-    const char* LVG_COMMAND = "./lvgCommand.sh";
+    
     void startProcess();
 };
 

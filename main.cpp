@@ -15,31 +15,12 @@
 #include"Dict.h"
 #include"Vec.h"
 #include"Canonicalizer.h"
+#include "constants.h"
 
 #include <flann/flann.hpp>
 using namespace std;
 
-//RELEASE
-//const string HOME_DIR = "/scratch2/jsybran";
 
-//DEBUG
-const string HOME_DIR = "/home/jsybran/Projects/Data";
-
-const string MEDLINE_XML_DIR = HOME_DIR + "/medline"; 
-const string RESULTS_DIR = HOME_DIR + "/results";
-const string CANON_FILE = RESULTS_DIR + "/canon";
-const string VECTOR_FILE = RESULTS_DIR + "/canon.vec";
-const string OUTPUT_FILE = RESULTS_DIR + "/graph.edges";
-const string LOG_FILE = HOME_DIR + "/log.txt";
-
-
-const string LVG_COMMAND = "lvg -f:0:C:P:q0:q1:q2:rs:g:T:t:u | awk 'BEGIN{FS=\"|\"}{print $2}'";
-const string FASTTEXT_COMMAND = "fasttext skipgram -dim 500 -ws 8 -maxn 8 -thread 12 -input " + CANON_FILE + " -output " + CANON_FILE;
-const string ABSTRACT_REGEX = "\\</?AbstractText.*?\\>";
-const string PMID_REGEX = "\\</?PMID.*?\\>";
-const int VECTOR_SIZE = 500;
-
-const int CANON_BASH_SIZE = 50;
 
 // trim from start
 static inline std::string &ltrim(std::string &s) {
@@ -79,7 +60,8 @@ vector<string> getFilesInDir(string dirPath){
 }
 
 //Returns PMID, AbstractText pairs
-map<string,string> parseXML(string fileName){
+//second param are all the values we already have
+map<string,string> parseXML(string fileName, const unordered_map<string,string>& backup){
     
     map<string,string> pmid2abstract;
     regex abstractRegex(ABSTRACT_REGEX,regex_constants::ECMAScript);
@@ -92,7 +74,7 @@ map<string,string> parseXML(string fileName){
     while(getline(fin,line)){
         if(regex_search(line,pmidRegex)){
             lastFoundAbstract = trim(lastFoundAbstract);
-            if(lastFoundPMID != "NULL" && lastFoundAbstract != ""){
+            if(backup.find(lastFoundPMID) == backup.end() && lastFoundPMID != "NULL" && lastFoundAbstract != ""){
                 pmid2abstract[lastFoundPMID] = lastFoundAbstract;
             }
             lastFoundPMID = regex_replace(line,pmidRegex,"");
@@ -128,13 +110,13 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
 #pragma omp parallel  for
     for(int i = 0 ; i < xmlPaths.size();i++){
         
-        map<string,string> tmp = parseXML(xmlPaths[i]);
+        map<string,string> tmp = parseXML(xmlPaths[i],pmid2abstract);
                 
         stringstream s;
         int BASH_SIZE = 50;
         
         vector<string> tmpPmids;
-        fstream resOut(RESULTS_DIR+"/res"+to_string(i),ios::out);
+        fstream resOut(RES_FILES_DIR+"/res"+to_string(i),ios::out);
     
         for(auto&val : tmp){
             s << val.second << endl;
@@ -142,7 +124,6 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
             
             if(tmpPmids.size() >= BASH_SIZE){
                 outputBash(tmpPmids,s.str(),resOut);
-
                 s.str( std::string() );
                 s.clear();
                 tmpPmids.clear();
@@ -197,6 +178,29 @@ void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string
     delete[] vecData;
 }
 
+void loadOldCanon(unordered_map<string,string>& pmid2canon){
+    vector<string> xmlPaths = getFilesInDir(BACKUP_FILES_DIR);
+    
+    #pragma omp parallel  for
+    for(int i = 0 ; i < xmlPaths.size();i++){
+        unordered_map<string,string> tmpMap;
+        fstream res(xmlPaths[i].c_str(), ios::in);
+        string line;
+        while(getline(res,line)){
+            stringstream s;
+            s << line;
+            string pmid;
+            s >> pmid;
+            string data = s.str();
+            tmpMap[pmid] = data;
+        }
+#pragma omp critical (LOAD_CANON_LOCK)
+        pmid2canon.insert(tmpMap.begin(),tmpMap.end());
+        
+        res.close();
+    }
+}
+
 int main(int argc, char** argv) {
 
     fstream lout(LOG_FILE,ios::out);
@@ -204,10 +208,15 @@ int main(int argc, char** argv) {
     
     unordered_map<string,string> pmid2abstract;
     
+    lout<<"Recovering Lost Data"<<endl;
+    loadOldCanon(pmid2abstract);
+    
+    lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl; 
+    
     lout<<"Parsing MEDLINE XML"<<endl;
     parseMedline(pmid2abstract,MEDLINE_XML_DIR);
     
-    lout<<"Found " << pmid2abstract.size() << " abstracts"<<endl;
+    lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
     
     vector<string> pmids;
     for(auto val : pmid2abstract){
