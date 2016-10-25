@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <iostream>
 #include <string>
+#include <signal.h>
+#include <unistd.h>
 #include "constants.h"
 
 using std::string;
@@ -23,7 +25,8 @@ private:
     int returnPipe[2];
     pid_t lvgPID;
     
-    void startProcess();
+    bool startProcess();
+    bool endProcess();
 };
 
 

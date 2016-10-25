@@ -9,6 +9,10 @@
         <group>
             <file>file:/home/jsybran/NetBeansProjects/MedlineGraphGenerator/main.cpp</file>
             <file>file:/home/jsybran/NetBeansProjects/MedlineGraphGenerator/Vec.cpp</file>
+            <file>file:/home/jsybran/NetBeansProjects/MedlineGraphGenerator/constants.h</file>
+            <file>file:/home/jsybran/NetBeansProjects/MedlineGraphGenerator/Canonicalizer.h</file>
+            <file>file:/home/jsybran/NetBeansProjects/MedlineGraphGenerator/Canonicalizer.cpp</file>
+            <file>file:/home/jsybran/NetBeansProjects/MedlineGraphGenerator/Dict.cpp</file>
         </group>
     </open-files>
 </project-private>
