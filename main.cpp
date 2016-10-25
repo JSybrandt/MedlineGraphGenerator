@@ -106,7 +106,7 @@ void outputBash(vector<string> & tmpPmids, string output,fstream& fout){
     tmpPmids.clear();
 }
 
-void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
+void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, fstream& lout){
     vector<string> xmlPaths = getFilesInDir(dirPath);
 #pragma omp parallel  for
     for(int i = 0 ; i < xmlPaths.size();i++){
@@ -138,8 +138,11 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
         #pragma omp critical (INSERT_ABSTRACT)
             pmid2abstract.insert(tmp.begin(),tmp.end());
         }
-            
-        }
+        
+        #pragma omp critical (LOGGER)
+        lout << "Parsed: "<< xmlPaths[i] <<endl
+             << "Found: " << tmp.size() << endl;
+    }
        
 }
 
@@ -228,7 +231,7 @@ int main(int argc, char** argv) {
     lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl; 
     
     lout<<"Parsing MEDLINE XML"<<endl;
-    parseMedline(pmid2abstract,MEDLINE_XML_DIR);
+    parseMedline(pmid2abstract,MEDLINE_XML_DIR,lout);
     
     lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
     
