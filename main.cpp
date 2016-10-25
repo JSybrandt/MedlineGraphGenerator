@@ -113,29 +113,34 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
         
         map<string,string> tmp = parseXML(xmlPaths[i],pmid2abstract);
                 
-        stringstream s;
-        int BASH_SIZE = 50;
-        
-        vector<string> tmpPmids;
-        fstream resOut(RES_FILES_DIR+"/res"+to_string(i),ios::out);
-    
-        for(auto&val : tmp){
-            s << val.second << endl;
-            tmpPmids.push_back(val.first);
+        if(tmp.size() <= 1){
             
-            if(tmpPmids.size() >= BASH_SIZE){
-                outputBash(tmpPmids,s.str(),resOut);
-                s.str( std::string() );
-                s.clear();
-                tmpPmids.clear();
+             stringstream s;
+            int BASH_SIZE = 50;
+
+            vector<string> tmpPmids;
+            fstream resOut(RES_FILES_DIR+"/res"+to_string(i),ios::out);
+
+            for(auto&val : tmp){
+                s << val.second << endl;
+                tmpPmids.push_back(val.first);
+
+                if(tmpPmids.size() >= BASH_SIZE){
+                    outputBash(tmpPmids,s.str(),resOut);
+                    s.str( std::string() );
+                    s.clear();
+                    tmpPmids.clear();
+                }
             }
+            outputBash(tmpPmids,s.str(),resOut);
+            resOut.close();
+
+        #pragma omp critical (INSERT_ABSTRACT)
+            pmid2abstract.insert(tmp.begin(),tmp.end());
         }
-        outputBash(tmpPmids,s.str(),resOut);
-        resOut.close();
-        
-#pragma omp critical (INSERT_ABSTRACT)
-        pmid2abstract.insert(tmp.begin(),tmp.end());
-    }
+            
+        }
+       
 }
 
 void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string outputFilePath){
