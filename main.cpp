@@ -113,8 +113,8 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath){
         
         map<string,string> tmp = parseXML(xmlPaths[i],pmid2abstract);
                 
-        if(tmp.size() <= 1){
-            
+        if(tmp.size() > 1){
+                       
              stringstream s;
             int BASH_SIZE = 50;
 
