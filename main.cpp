@@ -10,6 +10,7 @@
 #include<cctype>
 #include<locale>
 #include<sstream>
+#include <sys/wait.h>
 #include"omp.h"
 #include"Abstract.h"
 #include"Dict.h"
@@ -201,8 +202,18 @@ void loadOldCanon(unordered_map<string,string>& pmid2canon){
     }
 }
 
+void catchChild(int sigNum){
+    /* when we get here, we know there's a zombie child waiting */
+    int child_status;
+
+    wait(&child_status);
+    printf("child exited.\n");
+}
+
 int main(int argc, char** argv) {
 
+    signal(SIGCHLD, catchChild);
+    
     fstream lout(LOG_FILE,ios::out);
     lout<<"Started"<<endl;
     
