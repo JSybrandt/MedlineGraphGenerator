@@ -205,9 +205,7 @@ void loadOldCanon(unordered_map<string,string>& pmid2canon){
 void catchChild(int sigNum){
     /* when we get here, we know there's a zombie child waiting */
     int child_status;
-
     wait(&child_status);
-    printf("child exited.\n");
 }
 
 int main(int argc, char** argv) {
