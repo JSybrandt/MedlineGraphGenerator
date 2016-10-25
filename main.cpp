@@ -108,6 +108,7 @@ void outputBash(vector<string> & tmpPmids, string output,fstream& fout){
 
 void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, fstream& lout){
     vector<string> xmlPaths = getFilesInDir(dirPath);
+    int completeCount = 0;
 #pragma omp parallel  for
     for(int i = 0 ; i < xmlPaths.size();i++){
         
@@ -139,9 +140,12 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, f
             pmid2abstract.insert(tmp.begin(),tmp.end());
         }
         
+           
         #pragma omp critical (LOGGER)
-        lout << "Parsed: "<< xmlPaths[i] <<endl
-             << "Found: " << tmp.size() << endl;
+        {
+            completeCount++;
+            lout << (completeCount / (double) xmlPaths.size()) * 100 << "%" << endl;
+        }
     }
        
 }
