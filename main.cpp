@@ -259,7 +259,7 @@ int main(int argc, char** argv) {
         pmids.push_back(val.first);
     }
 
-    fstream canonOut1(CANON_FILE + "TMP",ios::out);
+    fstream canonOut1(CANON_FILE,ios::out);
 
     for(auto val : pmid2abstract){
         canonOut1 << val.second<<endl;
