@@ -92,6 +92,7 @@ bool Canonicalizer::startProcess(){
         dup2(returnPipe[WRITE_END],STDOUT_FILENO);
         
         execlp(LVG_COMMAND.c_str(),NULL);
+        exit(1); //this is only reached if the exec fails
     }    
     //parent
     else{
