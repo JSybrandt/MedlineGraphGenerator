@@ -239,6 +239,16 @@ int main(int argc, char** argv) {
 
     lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl;
 
+    lout << "Dumping what we got"<<endl;
+
+    fstream canonOut(CANON_FILE,ios::out);
+
+    for(auto val : pmid2abstract){
+        canonOut << val.second<<endl;
+    }
+
+    canonOut.close();
+
     lout<<"Parsing MEDLINE XML"<<endl;
     parseMedline(pmid2abstract,MEDLINE_XML_DIR,lout);
 
@@ -249,13 +259,13 @@ int main(int argc, char** argv) {
         pmids.push_back(val.first);
     }
 
-    fstream canonOut(CANON_FILE,ios::out);
+    fstream canonOut1(CANON_FILE + "TMP",ios::out);
 
     for(auto val : pmid2abstract){
-        canonOut << val.second<<endl;
+        canonOut1 << val.second<<endl;
     }
 
-    canonOut.close();
+    canonOut1.close();
 
     lout<<"Training Fast Text"<<endl;
     lout<<"Running " << FASTTEXT_COMMAND << endl;
