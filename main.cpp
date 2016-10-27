@@ -278,7 +278,7 @@ int main(int argc, char** argv) {
     unordered_map<string,Vec> pmid2vec;
 
     //if abstract - vec file doesn't exist
-    if(!ifstream(ABSTRACT_VECTOR_FILE.c_str())){
+    if(!ifstream(LOAD_ABSTRACT_VECTOR_FILE.c_str())){
         lout<<"Building Dict"<<endl;
         Dict dict(VECTOR_FILE);
 
@@ -306,27 +306,47 @@ int main(int argc, char** argv) {
         }
 
         lout << "Saving Vecs" << endl;
-
-        fstream vecsFile(ABSTRACT_VECTOR_FILE.c_str(), ios::out & ios::binary);
-        for(string pmid: pmids){
-          vecsFile << pmid << " " << pmid2vec[pmid].toString() << endl;
+        cout << pmid2vec.size()<<endl;
+//#pragma omp parallel
+        {
+            string outFile = ABSTRACT_VECTOR_DIR + "/absVec" + to_string(omp_get_thread_num());
+            cout << outFile << endl;
+            fstream vecsFile(outFile.c_str(), ios::out & ios::binary);
+            
+//#pragma omp for
+            for(int i = 0 ; i < pmids.size(); i++){
+                string pmid = pmids[i];
+                vecsFile << pmid << " " << pmid2vec[pmid].toString() << endl;
+            }
+            
+            vecsFile.close();
         }
-        vecsFile.close();
+        fstream(LOAD_ABSTRACT_VECTOR_FILE,ios::in) << "SAVED " << pmids.size() << " vectors"<<endl;
+        
     } else {
-      //loading saved vecs
-      fstream pmidVecFile(ABSTRACT_VECTOR_FILE.c_str(),ios::in & ios::binary);
-      string line;
-      while(getline(pmidVecFile,line)){
-          string pmid;
-          float tmp;
-          vector<float> vecData;
-          stringstream s;
-          s << line;
-          s >> pmid;
-          while(s >> tmp) vecData.push_back(tmp);
-          pmid2vec[pmid] = Vec(vecData);
-      }
-      pmidVecFile.close();
+        //loading saved vecs
+        vector<string> backupFiles = getFilesInDir(ABSTRACT_VECTOR_DIR);
+#pragma omp parallel for
+        for(int i = 0 ; i < backupFiles.size(); i++){
+            string path = backupFiles[i];
+            unordered_map<string,Vec> tempMap;
+            fstream pmidVecFile(path.c_str(),ios::in & ios::binary);
+            string line;
+            while(getline(pmidVecFile,line)){
+                string pmid;
+                float tmp;
+                vector<float> vecData;
+                stringstream s;
+                s << line;
+                s >> pmid;
+                while(s >> tmp) vecData.push_back(tmp);
+                tempMap[pmid] = Vec(vecData);
+            }
+            pmidVecFile.close();
+            
+#pragma omp critical (VEC_BACKUP)
+            pmid2vec.insert(tempMap.begin(), tempMap.end());
+        }
     }
 
     if(!ifstream(OUTPUT_FILE.c_str())){

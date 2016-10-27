@@ -19,7 +19,8 @@ const std::string CANON_FILE = RESULTS_DIR + "/canon";
 const std::string VECTOR_FILE = RESULTS_DIR + "/canon.vec";
 const std::string OUTPUT_FILE = RESULTS_DIR + "/graph.edges";
 const std::string LOG_FILE = HOME_DIR + "/log.txt";
-const std::string ABSTRACT_VECTOR_FILE = RESULTS_DIR + "/pmid2vec";
+const std::string ABSTRACT_VECTOR_DIR = RESULTS_DIR + "/abstractVecs";
+const std::string LOAD_ABSTRACT_VECTOR_FILE = RESULTS_DIR + "/loadAbstractVecs";
 
 
 //const string LVG_COMMAND = "lvg -f:0:C:P:q0:q1:q2:rs:g:T:t:u | awk 'BEGIN{FS=\"|\"}{print $2}'";
