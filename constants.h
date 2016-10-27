@@ -4,12 +4,12 @@
 using std::string;
 
 //RELEASE
-const string HOME_DIR = "/scratch2/jsybran";
-const std::string LVG_COMMAND = "/scratch2/jsybran/lvgCommand.sh";
+//const string HOME_DIR = "/scratch2/jsybran";
+//const std::string LVG_COMMAND = "/scratch2/jsybran/lvgCommand.sh";
 
 //DEBUG
-//const std::string HOME_DIR = "/home/jsybran/Projects/Data";
-//const std::string LVG_COMMAND = "./lvgCommand.sh";
+const std::string HOME_DIR = "/home/jsybran/Projects/Data";
+const std::string LVG_COMMAND = "./lvgCommand.sh";
 
 const std::string MEDLINE_XML_DIR = HOME_DIR + "/medline"; 
 const std::string RESULTS_DIR = HOME_DIR + "/results";

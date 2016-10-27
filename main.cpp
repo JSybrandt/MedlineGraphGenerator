@@ -306,14 +306,12 @@ int main(int argc, char** argv) {
         }
 
         lout << "Saving Vecs" << endl;
-        cout << pmid2vec.size()<<endl;
-//#pragma omp parallel
+#pragma omp parallel
         {
             string outFile = ABSTRACT_VECTOR_DIR + "/absVec" + to_string(omp_get_thread_num());
-            cout << outFile << endl;
-            fstream vecsFile(outFile.c_str(), ios::out & ios::binary);
+            ofstream vecsFile(outFile.c_str(), ofstream::binary);
             
-//#pragma omp for
+#pragma omp for
             for(int i = 0 ; i < pmids.size(); i++){
                 string pmid = pmids[i];
                 vecsFile << pmid << " " << pmid2vec[pmid].toString() << endl;
@@ -321,7 +319,9 @@ int main(int argc, char** argv) {
             
             vecsFile.close();
         }
-        fstream(LOAD_ABSTRACT_VECTOR_FILE,ios::in) << "SAVED " << pmids.size() << " vectors"<<endl;
+        fstream lvfOut(LOAD_ABSTRACT_VECTOR_FILE.c_str(),ios::out);
+        lvfOut << "SAVED " << pmids.size() << " vectors"<<endl;
+        lvfOut.close();
         
     } else {
         //loading saved vecs
@@ -330,7 +330,7 @@ int main(int argc, char** argv) {
         for(int i = 0 ; i < backupFiles.size(); i++){
             string path = backupFiles[i];
             unordered_map<string,Vec> tempMap;
-            fstream pmidVecFile(path.c_str(),ios::in & ios::binary);
+            ifstream pmidVecFile(path.c_str(),ifstream::binary);
             string line;
             while(getline(pmidVecFile,line)){
                 string pmid;
@@ -347,6 +347,9 @@ int main(int argc, char** argv) {
 #pragma omp critical (VEC_BACKUP)
             pmid2vec.insert(tempMap.begin(), tempMap.end());
         }
+        
+        lout << "Loaded " << pmid2vec.size() << " pmid vectors"<<endl;
+        lout << "Expected " << pmids.size() << " pmids" << endl;
     }
 
     if(!ifstream(OUTPUT_FILE.c_str())){
