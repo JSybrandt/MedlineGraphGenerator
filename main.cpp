@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
 #pragma omp parallel
         {
             string outFile = ABSTRACT_VECTOR_DIR + "/absVec" + to_string(omp_get_thread_num());
-            ofstream vecsFile(outFile.c_str(), ofstream::binary);
+            ofstream vecsFile(outFile.c_str());
             
 #pragma omp for
             for(int i = 0 ; i < pmids.size(); i++){
@@ -330,7 +330,7 @@ int main(int argc, char** argv) {
         for(int i = 0 ; i < backupFiles.size(); i++){
             string path = backupFiles[i];
             unordered_map<string,Vec> tempMap;
-            ifstream pmidVecFile(path.c_str(),ifstream::binary);
+            ifstream pmidVecFile(path.c_str());
             string line;
             while(getline(pmidVecFile,line)){
                 string pmid;
