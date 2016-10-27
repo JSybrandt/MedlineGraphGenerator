@@ -15,7 +15,6 @@ using std::string;
 
 class Vec {
 private:
-    
 	vector<float> data;
         const int SIZE = 500;
 

@@ -112,14 +112,17 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, f
 #pragma omp parallel  for
     for(int i = 0 ; i < xmlPaths.size();i++){
 
+#pragma omp critical (LOGGER)
+      lout << "Parsing:" << xmlPaths[i] << endl;
+
         map<string,string> tmp = parseXML(xmlPaths[i],pmid2abstract);
 
         if(tmp.size() > 1){
 #pragma omp critical (LOGGER)
-          lout << "New: " << xmlPaths[i]<<endl;
+          lout << "New:" << xmlPaths[i]<<endl;
 
              stringstream s;
-            int BASH_SIZE = 50;
+            int BASH_SIZE = 25;
 
             vector<string> tmpPmids;
             fstream resOut(RES_FILES_DIR+"/res"+to_string(i),ios::out);
@@ -239,69 +242,99 @@ int main(int argc, char** argv) {
 
     lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl;
 
-    lout << "Dumping what we got"<<endl;
+    //if canon file doesn't exist
+    if(!ifstream(CANON_FILE.c_str())){
+        lout<<"Parsing MEDLINE XML"<<endl;
+        parseMedline(pmid2abstract,MEDLINE_XML_DIR,lout);
 
-    fstream canonOut(CANON_FILE,ios::out);
+        lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
 
-    for(auto val : pmid2abstract){
-        canonOut << val.second<<endl;
+        //save canon
+        fstream canonOut(CANON_FILE,ios::out);
+
+        for(auto val : pmid2abstract){
+            canonOut << val.second<<endl;
+        }
+
+        canonOut.close();
+    }else{
+      lout << "Skipping canonicalizing"<< endl;
     }
-
-    canonOut.close();
-
-    lout<<"Parsing MEDLINE XML"<<endl;
-    parseMedline(pmid2abstract,MEDLINE_XML_DIR,lout);
-
-    lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
 
     vector<string> pmids;
     for(auto val : pmid2abstract){
         pmids.push_back(val.first);
     }
 
-    fstream canonOut1(CANON_FILE,ios::out);
-
-    for(auto val : pmid2abstract){
-        canonOut1 << val.second<<endl;
+    //if vector file doesnt exist (this is word - vec file)
+    if(!ifstream(VECTOR_FILE.c_str())){
+        lout<<"Training Fast Text"<<endl;
+        lout<<"Running " << FASTTEXT_COMMAND << endl;
+        system(FASTTEXT_COMMAND.c_str());
+    }else{
+        lout<<"Skipping training"<<endl;
     }
-
-    canonOut1.close();
-
-    lout<<"Training Fast Text"<<endl;
-    lout<<"Running " << FASTTEXT_COMMAND << endl;
-    system(FASTTEXT_COMMAND.c_str());
-
-    lout<<"Building Dict"<<endl;
-    Dict dict(VECTOR_FILE);
 
     unordered_map<string,Vec> pmid2vec;
 
-    lout<<"Getting vectors per abstract"<<endl;
+    //if abstract - vec file doesn't exist
+    if(!ifstream(ABSTRACT_VECTOR_FILE.c_str())){
+        lout<<"Building Dict"<<endl;
+        Dict dict(VECTOR_FILE);
+
+        lout<<"Getting vectors per abstract"<<endl;
 #pragma omp parallel for
-    for(int i = 0 ; i < pmids.size();i++){
-        string pmid = pmids[i];
-        string canon = pmid2abstract[pmid];
-        vector<Vec> wordVecs;
-        stringstream s;
-        string word;
-        s << canon;
-        while(s >> word){
-            if(dict.contains(word))
-                wordVecs.push_back(dict.getVec(word));
-        }
-        Vec vec;
-        for (Vec& v : wordVecs) {
-                vec += v;
-        }
-        if(wordVecs.size() > 0)
-            vec /= (float)wordVecs.size();
+        for(int i = 0 ; i < pmids.size();i++){
+            string pmid = pmids[i];
+            string canon = pmid2abstract[pmid];
+            vector<Vec> wordVecs;
+            stringstream s;
+            string word;
+            s << canon;
+            while(s >> word){
+                if(dict.contains(word))
+                    wordVecs.push_back(dict.getVec(word));
+            }
+            Vec vec;
+            for (Vec& v : wordVecs) {
+                    vec += v;
+            }
+            if(wordVecs.size() > 0)
+                vec /= (float)wordVecs.size();
 #pragma omp critical (SET_PMID_VEC)
-        pmid2vec[pmid] = vec;
+            pmid2vec[pmid] = vec;
+        }
+
+        lout << "Saving Vecs" << endl;
+
+        fstream vecsFile(ABSTRACT_VECTOR_FILE.c_str(), ios::out & ios::binary);
+        for(string pmid: pmids){
+          vecsFile << pmid << " " << pmid2vec[pmid].toString() << endl;
+        }
+        vecsFile.close();
+    } else {
+      //loading saved vecs
+      fstream pmidVecFile(ABSTRACT_VECTOR_FILE.c_str(),ios::in & ios::binary);
+      string line;
+      while(getline(pmidVecFile,line)){
+          string pmid;
+          float tmp;
+          vector<float> vecData;
+          stringstream s;
+          s << line;
+          s >> pmid;
+          while(s >> tmp) vecData.push_back(tmp);
+          pmid2vec[pmid] = Vec(vecData);
+      }
+      pmidVecFile.close();
     }
 
-    lout<<"Running FLANN"<<endl;
-    runFlann(pmid2vec,pmids, OUTPUT_FILE);
-
+    if(!ifstream(OUTPUT_FILE.c_str())){
+        lout<<"Running FLANN"<<endl;
+        runFlann(pmid2vec,pmids, OUTPUT_FILE);
+    }else{
+        lout << "SKIPPING FLANN" << endl;
+    }
     lout << "DONE!" << endl;
 
     lout.close();
