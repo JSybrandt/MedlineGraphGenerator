@@ -236,49 +236,48 @@ int main(int argc, char** argv) {
     lout<<"Started"<<endl;
 
     unordered_map<string,string> pmid2abstract;
-
-    lout<<"Recovering Lost Data"<<endl;
-    loadOldCanon(pmid2abstract);
-
-    lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl;
-
-    //if canon file doesn't exist
-    if(!ifstream(CANON_FILE.c_str())){
-        lout<<"Parsing MEDLINE XML"<<endl;
-        parseMedline(pmid2abstract,MEDLINE_XML_DIR,lout);
-
-        lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
-
-        //save canon
-        fstream canonOut(CANON_FILE,ios::out);
-
-        for(auto val : pmid2abstract){
-            canonOut << val.second<<endl;
-        }
-
-        canonOut.close();
-    }else{
-      lout << "Skipping canonicalizing"<< endl;
-    }
-
-    vector<string> pmids;
-    for(auto val : pmid2abstract){
-        pmids.push_back(val.first);
-    }
-
-    //if vector file doesnt exist (this is word - vec file)
-    if(!ifstream(VECTOR_FILE.c_str())){
-        lout<<"Training Fast Text"<<endl;
-        lout<<"Running " << FASTTEXT_COMMAND << endl;
-        system(FASTTEXT_COMMAND.c_str());
-    }else{
-        lout<<"Skipping training"<<endl;
-    }
-
     unordered_map<string,Vec> pmid2vec;
+    vector<string> pmids;
 
     //if abstract - vec file doesn't exist
     if(!ifstream(LOAD_ABSTRACT_VECTOR_FILE.c_str())){
+        lout<<"Recovering Lost Data"<<endl;
+        loadOldCanon(pmid2abstract);
+
+        lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl;
+
+        //if canon file doesn't exist
+        if(!ifstream(CANON_FILE.c_str())){
+            lout<<"Parsing MEDLINE XML"<<endl;
+            parseMedline(pmid2abstract,MEDLINE_XML_DIR,lout);
+
+            lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
+
+            //save canon
+            fstream canonOut(CANON_FILE,ios::out);
+
+            for(auto val : pmid2abstract){
+                canonOut << val.second<<endl;
+            }
+
+            canonOut.close();
+        }else{
+          lout << "Skipping canonicalizing"<< endl;
+        }
+
+        for(auto val : pmid2abstract){
+            pmids.push_back(val.first);
+        }
+
+        //if vector file doesnt exist (this is word - vec file)
+        if(!ifstream(VECTOR_FILE.c_str())){
+            lout<<"Training Fast Text"<<endl;
+            lout<<"Running " << FASTTEXT_COMMAND << endl;
+            system(FASTTEXT_COMMAND.c_str());
+        }else{
+            lout<<"Skipping training"<<endl;
+        }
+    
         lout<<"Building Dict"<<endl;
         Dict dict(VECTOR_FILE);
 
@@ -324,6 +323,9 @@ int main(int argc, char** argv) {
         lvfOut.close();
         
     } else {
+        
+        lout << "Loading vecs" << endl;
+        
         //loading saved vecs
         vector<string> backupFiles = getFilesInDir(ABSTRACT_VECTOR_DIR);
 #pragma omp parallel for
@@ -348,8 +350,11 @@ int main(int argc, char** argv) {
             pmid2vec.insert(tempMap.begin(), tempMap.end());
         }
         
+        for(auto val : pmid2vec){
+            pmids.push_back(val.first);
+        }
+        
         lout << "Loaded " << pmid2vec.size() << " pmid vectors"<<endl;
-        lout << "Expected " << pmids.size() << " pmids" << endl;
     }
 
     if(!ifstream(OUTPUT_FILE.c_str())){
