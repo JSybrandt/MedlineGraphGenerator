@@ -11,7 +11,7 @@ using std::string;
 const std::string HOME_DIR = "/home/jsybran/Projects/Data";
 const std::string LVG_COMMAND = "./lvgCommand.sh";
 
-const std::string MEDLINE_XML_DIR = HOME_DIR + "/medline"; 
+const std::string MEDLINE_XML_DIR = HOME_DIR + "/medline";
 const std::string RESULTS_DIR = HOME_DIR + "/results";
 const std::string RES_FILES_DIR = RESULTS_DIR + "/res";
 const std::string BACKUP_FILES_DIR = RESULTS_DIR + "/backup";
@@ -27,6 +27,8 @@ const std::string LOAD_ABSTRACT_VECTOR_FILE = RESULTS_DIR + "/loadAbstractVecs";
 const std::string FASTTEXT_COMMAND = "fasttext skipgram -dim 500 -ws 8 -maxn 8 -thread 24 -input " + CANON_FILE + " -output " + CANON_FILE;
 const std::string ABSTRACT_REGEX = "\\</?AbstractText.*?\\>";
 const std::string PMID_REGEX = "\\</?PMID.*?\\>";
+const std::string TITLE_REGEX = "\\</?ArticleTitle.*?\\>";
+const std::string END_OF_RECORD_REGEX = "\\<\\/MedlineCitation.*?\\>"
 const int VECTOR_SIZE = 500;
 
 const int CANON_BASH_SIZE = 50;

@@ -67,6 +67,8 @@ map<string,string> parseXML(string fileName, const unordered_map<string,string>&
     map<string,string> pmid2abstract;
     regex abstractRegex(ABSTRACT_REGEX,regex_constants::ECMAScript);
     regex pmidRegex(PMID_REGEX,regex_constants::ECMAScript);
+    regex titleRegex(TITLE_REGEX,regex_constants::ECMAScript);
+    regex eorRegex(END_OF_RECORD_REGEX,regex_constants::ECMAScript);
     fstream fin(fileName, ios::in);
     string line;
     string lastFoundPMID = "NULL";
@@ -74,20 +76,22 @@ map<string,string> parseXML(string fileName, const unordered_map<string,string>&
 
     while(getline(fin,line)){
         if(regex_search(line,pmidRegex)){
-            lastFoundAbstract = trim(lastFoundAbstract);
-            if(backup.find(lastFoundPMID) == backup.end() && lastFoundPMID != "NULL" && lastFoundAbstract != ""){
-                pmid2abstract[lastFoundPMID] = lastFoundAbstract;
-            }
-            lastFoundPMID = regex_replace(line,pmidRegex,"");
-            lastFoundAbstract = "";
+            lastFoundPMID = trim(regex_replace(line,pmidRegex,""));
         }
         if(regex_search(line,abstractRegex)){
-            lastFoundAbstract += regex_replace(line,abstractRegex,"") + " ";
+            lastFoundAbstract += trim(regex_replace(line,abstractRegex,"")) + " ";
+        }
+        if(regex_search(line,titleRegex)){
+            lastFoundAbstract += trim(regex_replace(line,titleRegex,"")) + " ";
+        }
+        if(regex_search(line,eorRegex)){
+            if(backup.find(lastFoundPMID) == backup.end() && lastFoundPMID != "NULL" && lastFoundAbstract != ""){
+                pmid2abstract[lastFoundPMID] = trim(lastFoundAbstract);
+            }
+            lastFoundPMID = "NULL";
+            lastFoundAbstract = "";
         }
     }
-    //Need extra check at end
-    if(lastFoundPMID != "NULL" && lastFoundAbstract != "")
-        pmid2abstract[lastFoundPMID] = lastFoundAbstract;
 
     fin.close();
     return pmid2abstract;
@@ -161,6 +165,9 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, f
 void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string outputFilePath){
     //row major order, map.size() rows and VECTOR_SIZE cols
     float * vecData = new float[pmid2vec.size()*VECTOR_SIZE];
+
+    cout << "VEC DATA SIZE" << (pmid2vec.size() * VECTOR_SIZE) << endl;
+    cout << "EXPECTED DATA SIZE" << pmids.size() * VECTOR_SIZE << endl;
 
     int pmidCount = 0;
     for(string pmid : pmids){
@@ -277,7 +284,7 @@ int main(int argc, char** argv) {
         }else{
             lout<<"Skipping training"<<endl;
         }
-    
+
         lout<<"Building Dict"<<endl;
         Dict dict(VECTOR_FILE);
 
@@ -309,23 +316,23 @@ int main(int argc, char** argv) {
         {
             string outFile = ABSTRACT_VECTOR_DIR + "/absVec" + to_string(omp_get_thread_num());
             ofstream vecsFile(outFile.c_str());
-            
+
 #pragma omp for
             for(int i = 0 ; i < pmids.size(); i++){
                 string pmid = pmids[i];
                 vecsFile << pmid << " " << pmid2vec[pmid].toString() << endl;
             }
-            
+
             vecsFile.close();
         }
         fstream lvfOut(LOAD_ABSTRACT_VECTOR_FILE.c_str(),ios::out);
         lvfOut << "SAVED " << pmids.size() << " vectors"<<endl;
         lvfOut.close();
-        
+
     } else {
-        
+
         lout << "Loading vecs" << endl;
-        
+
         //loading saved vecs
         vector<string> backupFiles = getFilesInDir(ABSTRACT_VECTOR_DIR);
 #pragma omp parallel for
@@ -345,15 +352,15 @@ int main(int argc, char** argv) {
                 tempMap[pmid] = Vec(vecData);
             }
             pmidVecFile.close();
-            
+
 #pragma omp critical (VEC_BACKUP)
             pmid2vec.insert(tempMap.begin(), tempMap.end());
         }
-        
+
         for(auto val : pmid2vec){
             pmids.push_back(val.first);
         }
-        
+
         lout << "Loaded " << pmid2vec.size() << " pmid vectors"<<endl;
     }
 

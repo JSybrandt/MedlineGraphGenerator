@@ -1,4 +1,4 @@
 #!/bin/bash
 module load gcc/6.1.0 openmpi/1.10.3
 g++ *.cpp -I ~/lib/include/ -l flann -L ~/lib/ -fopenmp -O2 -o gen
-#g++ *.cpp -I ~/lib/include/ -l flann -L ~/lib/ -fopenmp -ggdb3 -O0 -o gen 
+g++ *.cpp -I ~/lib/include/ -l flann -L ~/lib/ -fopenmp -ggdb3 -O0 -o genD
