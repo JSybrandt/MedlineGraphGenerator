@@ -17,14 +17,14 @@ public:
     Canonicalizer();
     Canonicalizer(const Canonicalizer& orig);
     virtual ~Canonicalizer();
-    
+
     string getCanon(string input);
-   
+
 private:
     int lvgPipe[2];
     int returnPipe[2];
     pid_t lvgPID;
-    
+
     bool startProcess();
     bool endProcess();
 };

@@ -4,10 +4,10 @@
  * and open the template in the editor.
  */
 
-/* 
+/*
  * File:   Canonicalizer.cpp
  * Author: jsybran
- * 
+ *
  * Created on October 20, 2016, 8:23 AM
  */
 
@@ -63,7 +63,7 @@ string Canonicalizer::getCanon(string input){
         }
         endProcess();
     }while(!success && numFails < 10);
-    
+
     return res;
 }
 
@@ -84,16 +84,16 @@ bool Canonicalizer::startProcess(){
 }
     //child
     if(lvgPID == 0){
-               
+
         close(lvgPipe[WRITE_END]);
         dup2(lvgPipe[READ_END],STDIN_FILENO);
-        
+
         close(returnPipe[READ_END]);
         dup2(returnPipe[WRITE_END],STDOUT_FILENO);
-        
+
         execlp(LVG_COMMAND.c_str(),NULL);
         exit(1); //this is only reached if the exec fails
-    }    
+    }
     //parent
     else{
         close(lvgPipe[READ_END]);

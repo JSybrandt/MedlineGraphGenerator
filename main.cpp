@@ -1,4 +1,5 @@
 
+#include <stdio.h>
 #include<iostream>
 #include<dirent.h>
 #include<vector>
@@ -76,13 +77,13 @@ map<string,string> parseXML(string fileName, const unordered_map<string,string>&
 
     while(getline(fin,line)){
         if(regex_search(line,pmidRegex)){
-            lastFoundPMID = trim(regex_replace(line,pmidRegex,""));
+            lastFoundPMID = regex_replace(line,pmidRegex,"");
         }
         if(regex_search(line,abstractRegex)){
-            lastFoundAbstract += trim(regex_replace(line,abstractRegex,"")) + " ";
+            lastFoundAbstract += regex_replace(line,abstractRegex,"") + " ";
         }
         if(regex_search(line,titleRegex)){
-            lastFoundAbstract += trim(regex_replace(line,titleRegex,"")) + " ";
+            lastFoundAbstract += regex_replace(line,titleRegex,"") + " ";
         }
         if(regex_search(line,eorRegex)){
             if(backup.find(lastFoundPMID) == backup.end() && lastFoundPMID != "NULL" && lastFoundAbstract != ""){
@@ -97,7 +98,7 @@ map<string,string> parseXML(string fileName, const unordered_map<string,string>&
     return pmid2abstract;
 }
 
-void outputBash(vector<string> & tmpPmids, string output,fstream& fout){
+void outputBash(const vector<string> & tmpPmids, string output,fstream& fout, map<string,string>& tmpPmid2Abstract){
     Canonicalizer canonMaker;
     stringstream r;
     r << canonMaker.getCanon(output);
@@ -106,8 +107,8 @@ void outputBash(vector<string> & tmpPmids, string output,fstream& fout){
         string t;
         getline(r,t);
         fout << pmid << " " << t <<endl;
+        tmpPmid2Abstract[pmid] = t;
     }
-    tmpPmids.clear();
 }
 
 void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, fstream& lout){
@@ -119,47 +120,48 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, f
 #pragma omp critical (LOGGER)
       lout << "Parsing:" << xmlPaths[i] << endl;
 
-        map<string,string> tmp = parseXML(xmlPaths[i],pmid2abstract);
+      // Simple PMID, abstract map, contains new values
+      map<string,string> tmp = parseXML(xmlPaths[i],pmid2abstract);
 
-        if(tmp.size() > 1){
+      if(tmp.size() > 1){
 #pragma omp critical (LOGGER)
-          lout << "New:" << xmlPaths[i]<<endl;
+         lout << "New:" << xmlPaths[i]<<endl;
 
-             stringstream s;
-            int BASH_SIZE = 25;
+         stringstream s;
+         int BASH_SIZE = 25;
 
-            vector<string> tmpPmids;
-            fstream resOut(RES_FILES_DIR+"/res"+to_string(i),ios::out);
+         vector<string> tmpPmids;
+         fstream resOut(RES_FILES_DIR+"/res"+to_string(i),ios::out);
 
-            for(auto&val : tmp){
-                s << val.second << endl;
-                tmpPmids.push_back(val.first);
+         for(auto&val : tmp){
+             s << val.second << endl;
+             tmpPmids.push_back(val.first);
 
-                if(tmpPmids.size() >= BASH_SIZE){
-                    outputBash(tmpPmids,s.str(),resOut);
-                    s.str( std::string() );
-                    s.clear();
-                    tmpPmids.clear();
-                }
-            }
-            outputBash(tmpPmids,s.str(),resOut);
-            resOut.close();
+             if(tmpPmids.size() >= BASH_SIZE){
+                 outputBash(tmpPmids,s.str(),resOut,tmp);
+                 s.str( std::string() );
+                 s.clear();
+                 tmpPmids.clear();
+             }
+         }
+         outputBash(tmpPmids,s.str(),resOut,tmp);
+         tmpPmids.clear();
+         resOut.close();
 
-        #pragma omp critical (INSERT_ABSTRACT)
-            pmid2abstract.insert(tmp.begin(),tmp.end());
-        } else{
+#pragma omp critical (INSERT_ABSTRACT)
+         pmid2abstract.insert(tmp.begin(),tmp.end());
+     } else{
 #pragma omp critical (LOGGER)
-          lout<<"Skip:" << xmlPaths[i]<<endl;
-        }
+       lout<<"Skip:" << xmlPaths[i]<<endl;
+     }
 
 
-        #pragma omp critical (LOGGER)
-        {
-            completeCount++;
-            lout << (completeCount / (double) xmlPaths.size()) * 100 << "%" << endl;
-        }
-    }
-
+     #pragma omp critical (LOGGER)
+     {
+         completeCount++;
+         lout << (completeCount / (double) xmlPaths.size()) * 100 << "%" << endl;
+     }
+  }
 }
 
 void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string outputFilePath){
@@ -229,6 +231,68 @@ void loadOldCanon(unordered_map<string,string>& pmid2canon){
     }
 }
 
+//This function is going to take the information stored in CANON_FILE
+//and use ToPMine to generate the TOPMINE_OUT_FILE. This second file is a comma
+//seperated list of keywords. We will convert this back into a version FastText can read,
+//creating CANON_POT_TOPMINE_FILE. 
+void runToPMine(const vector<string>& pmids, unordered_map<string,string>& pmid2abstract, fstream& lout){
+  lout << "Running ToPMine"<<endl;
+  //actaully run topmine
+  FILE* stdOut = popen(TOPMINE_COMMAND.c_str(), "r");
+  int bufSize = 20;
+  char buffer[bufSize];
+  while(fgets(buffer,bufSize, stdOut)){
+    for(char* p = buffer; *p; p++){
+      lout << *p;
+    }
+  }
+  fclose(stdOut);
+
+  lout << "Converting TOPMINE_OUT to readable canon file" << endl;
+
+  //at this point, data has moved from CANON_FILE to TOPMINE_OUT_FILE
+  fstream topmineIn(TOPMINE_OUT_FILE.c_str(), ios::in);
+  fstream postCanonOut(CANON_POST_TOPMINE_FILE.c_str(), ios::out);
+
+  string line;
+  string phrase;
+  string word;
+  bool firstWordInPhrase = true;
+
+  while(getline(topmineIn,line)){
+    stringstream lineStream;
+    lineStream << line;
+    while(getline(lineStream, phrase, ',')){
+      stringstream phraseStream;
+      phraseStream << phrase;
+      firstWordInPhrase = true;
+      while(phraseStream >> word){
+        if(!firstWordInPhrase){
+          postCanonOut<<"_";
+        }
+        firstWordInPhrase = false;
+        postCanonOut << word;
+      }
+      postCanonOut << " ";
+    }
+    postCanonOut << endl;
+  }
+
+  topmineIn.close();
+  postCanonOut.close();
+
+  //canon is not in CANON_POST_TOPMINE_FILE
+  lout << "Finished ToPMine. Converted canon now in " << CANON_POST_TOPMINE_FILE << endl;
+}
+
+void makeResultsDirs(){
+  system(("mkdir -p " + MEDLINE_XML_DIR).c_str());
+  system(("mkdir -p " + RESULTS_DIR).c_str());
+  system(("mkdir -p " + RES_FILES_DIR).c_str());
+  system(("mkdir -p " + BACKUP_FILES_DIR).c_str());
+  system(("mkdir -p " + ABSTRACT_VECTOR_DIR).c_str());
+}
+
 void catchChild(int sigNum){
     /* when we get here, we know there's a zombie child waiting */
     int child_status;
@@ -239,8 +303,18 @@ int main(int argc, char** argv) {
 
     signal(SIGCHLD, catchChild);
 
+    cout << "THIS IS A TEST"<< endl;
+
+    Canonicalizer c;
+    cout << c.getCanon("My test of the canonicalizer is multi-coloured");
+    cout << "TEST OVER" << endl;
+
+
     fstream lout(LOG_FILE,ios::out);
     lout<<"Started"<<endl;
+
+    lout<<"Making Directories"<<endl;
+    makeResultsDirs();
 
     unordered_map<string,string> pmid2abstract;
     unordered_map<string,Vec> pmid2vec;
@@ -260,22 +334,41 @@ int main(int argc, char** argv) {
 
             lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
 
-            //save canon
+            //save canon in order
             fstream canonOut(CANON_FILE,ios::out);
+            fstream pmidOut(CANON_PMID_ORDER_FILE,ios::out);
 
             for(auto val : pmid2abstract){
                 canonOut << val.second<<endl;
+                pmidOut << val.first << endl;
+                pmids.push_back(val.first);
             }
 
             canonOut.close();
+            pmidOut.close();
         }else{
           lout << "Skipping canonicalizing"<< endl;
+          lout << "Recovering PMIDS"<< endl;
+          fstream pmidIn(CANON_PMID_ORDER_FILE,ios::in);
+          string tmp;
+          while(pmidIn >> tmp)
+              pmids.push_back(tmp);
+          pmidIn.close();
         }
 
-        for(auto val : pmid2abstract){
-            pmids.push_back(val.first);
+        //If we have not sent the canon through TOPMINE
+        if(!ifstream(CANON_POST_TOPMINE_FILE.c_str())){
+          runToPMine(pmids, pmid2abstract, lout);
+        }else{
+          auto pmidIt = pmids.begin();
+          fstream canonIn(CANON_POST_TOPMINE_FILE.c_str(),ios::in);
+          string line;
+          while(getline(canonIn, line)){
+            pmid2abstract[*pmidIt] = line;
+            pmidIt++;
+          }
+          canonIn.close();
         }
-
         //if vector file doesnt exist (this is word - vec file)
         if(!ifstream(VECTOR_FILE.c_str())){
             lout<<"Training Fast Text"<<endl;
