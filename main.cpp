@@ -302,6 +302,7 @@ void catchChild(int sigNum){
 
 int main(int argc, char** argv) {
 
+  const int EXPECTED_SIZE = 30000000;
     signal(SIGCHLD, catchChild);
 
     cout << "THIS IS A TEST"<< endl;
@@ -317,9 +318,11 @@ int main(int argc, char** argv) {
     lout<<"Making Directories"<<endl;
     makeResultsDirs();
 
-    unordered_map<string,string> pmid2abstract;
-    unordered_map<string,Vec> pmid2vec;
-    vector<string> pmids;
+    lout<<"Initializing maps" <<endl;
+
+    unordered_map<string,string> pmid2abstract(EXPECTED_SIZE);
+    unordered_map<string,Vec> pmid2vec(EXPECTED_SIZE);
+    vector<string> pmids(EXPECTED_SIZE);
 
     //if abstract - vec file doesn't exist
     if(!ifstream(LOAD_ABSTRACT_VECTOR_FILE.c_str())){

@@ -17,6 +17,5 @@ rm $LOG_FILE
 touch $LOG_FILE
 
 $tail -f $LOG_FILE &
-export OMP_NUM_THREADS=16
 /home/jsybran/projects/MedlineGraphGenerator/bin/medlineGraphGen
 
