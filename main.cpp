@@ -125,7 +125,8 @@ void parseMedline(unordered_map<string,string>& pmid2abstract, string dirPath, f
 
       if(tmp.size() > 1){
 #pragma omp critical (LOGGER)
-         lout << "New:" << xmlPaths[i]<<endl;
+         lout << "New:" << xmlPaths[i]<<endl
+              <<"\tFound:" << xmlPaths.size()<<endl;
 
          stringstream s;
          int BASH_SIZE = 25;

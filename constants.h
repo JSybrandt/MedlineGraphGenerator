@@ -31,7 +31,7 @@ const std::string TOPMINE_COMMAND = "topmine";
 const std::string ABSTRACT_REGEX = "\\</?AbstractText.*?\\>";
 const std::string PMID_REGEX = "\\</?PMID.*?\\>";
 const std::string TITLE_REGEX = "\\</?ArticleTitle.*?\\>";
-const std::string END_OF_RECORD_REGEX = "\\<\\/MedlineCitation.*?\\>";
+const std::string END_OF_RECORD_REGEX = "\\</MedlineCitation.*?\\>";
 const int VECTOR_SIZE = 500;
 
 const int CANON_BASH_SIZE = 50;
