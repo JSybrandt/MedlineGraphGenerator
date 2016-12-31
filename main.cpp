@@ -236,7 +236,7 @@ void loadOldCanon(unordered_map<string,string>& pmid2canon){
 //and use ToPMine to generate the TOPMINE_OUT_FILE. This second file is a comma
 //seperated list of keywords. We will convert this back into a version FastText can read,
 //creating CANON_POT_TOPMINE_FILE. 
-void runToPMine(const vector<string>& pmids, unordered_map<string,string>& pmid2abstract, fstream& lout){
+void runToPMine(const vector<string>& pmids, fstream& lout){
   lout << "Running ToPMine"<<endl;
   //actaully run topmine
   FILE* stdOut = popen(TOPMINE_COMMAND.c_str(), "r");
@@ -305,13 +305,6 @@ int main(int argc, char** argv) {
   const int EXPECTED_SIZE = 30000000;
     signal(SIGCHLD, catchChild);
 
-    cout << "THIS IS A TEST"<< endl;
-
-    Canonicalizer c;
-    cout << c.getCanon("My test of the canonicalizer is multi-coloured");
-    cout << "TEST OVER" << endl;
-
-
     fstream lout(LOG_FILE,ios::out);
     lout<<"Started"<<endl;
 
@@ -326,14 +319,15 @@ int main(int argc, char** argv) {
 
     //if abstract - vec file doesn't exist
     if(!ifstream(LOAD_ABSTRACT_VECTOR_FILE.c_str())){
-        lout<<"Recovering Lost Data"<<endl;
-        loadOldCanon(pmid2abstract);
-
-        lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl;
 
         //if canon file doesn't exist
         if(!ifstream(CANON_FILE.c_str())){
+            lout<<"Recovering Lost Data"<<endl;
+            loadOldCanon(pmid2abstract);
+
+            lout<<"Recovered "<< pmid2abstract.size() << " old records" << endl;
             lout<<"Parsing MEDLINE XML"<<endl;
+
             parseMedline(pmid2abstract,MEDLINE_XML_DIR,lout);
 
             lout<<"Found " << pmid2abstract.size() << " total abstracts"<<endl;
@@ -352,26 +346,35 @@ int main(int argc, char** argv) {
             pmidOut.close();
         }else{
           lout << "Skipping canonicalizing"<< endl;
+          /*
           lout << "Recovering PMIDS"<< endl;
           fstream pmidIn(CANON_PMID_ORDER_FILE,ios::in);
           string tmp;
           while(pmidIn >> tmp)
               pmids.push_back(tmp);
           pmidIn.close();
+          lout << "Recovered " << pmids.size() << " pmids"<<endl;
+          */
         }
 
         //If we have not sent the canon through TOPMINE
         if(!ifstream(CANON_POST_TOPMINE_FILE.c_str())){
-          runToPMine(pmids, pmid2abstract, lout);
+          runToPMine(pmids, lout);
         }else{
-          auto pmidIt = pmids.begin();
+          pmids.clear();
+          lout<< "skiping topmine"<<endl;
+          long long index = 1;
           fstream canonIn(CANON_POST_TOPMINE_FILE.c_str(),ios::in);
           string line;
           while(getline(canonIn, line)){
-            pmid2abstract[*pmidIt] = line;
-            pmidIt++;
+            string id = "i" + to_string(index);
+            pmids.push_back(id);
+            pmid2abstract[id] = line;
+            index++;
           }
           canonIn.close();
+          lout << "Loaded canon post topmine"<<endl;
+          lout << "Loaded " << pmid2abstract.size() << " abstracts" << endl;
         }
         //if vector file doesnt exist (this is word - vec file)
         if(!ifstream(VECTOR_FILE.c_str())){
@@ -379,11 +382,12 @@ int main(int argc, char** argv) {
             lout<<"Running " << FASTTEXT_COMMAND << endl;
             system(FASTTEXT_COMMAND.c_str());
         }else{
-            lout<<"Skipping training"<<endl;
+            lout<<"Skipping training with fasttext"<<endl;
         }
 
         lout<<"Building Dict"<<endl;
         Dict dict(VECTOR_FILE);
+        lout << "Loaded " << dict.size() << " words"<<endl;
 
         lout<<"Getting vectors per abstract"<<endl;
 #pragma omp parallel for
@@ -405,7 +409,7 @@ int main(int argc, char** argv) {
             if(wordVecs.size() > 0)
                 vec /= (float)wordVecs.size();
 #pragma omp critical (SET_PMID_VEC)
-            pmid2vec[pmid] = vec;
+            if(wordVecs.size() > 0) pmid2vec[pmid] = vec;
         }
 
         lout << "Saving Vecs" << endl;
@@ -417,7 +421,8 @@ int main(int argc, char** argv) {
 #pragma omp for
             for(int i = 0 ; i < pmids.size(); i++){
                 string pmid = pmids[i];
-                vecsFile << pmid << " " << pmid2vec[pmid].toString() << endl;
+                if(pmid2vec.find(pmid)!=pmid2vec.end())
+                  vecsFile << pmid << " " << pmid2vec[pmid].toString() << endl;
             }
 
             vecsFile.close();
@@ -463,6 +468,9 @@ int main(int argc, char** argv) {
 
     if(!ifstream(OUTPUT_FILE.c_str())){
         lout<<"Running FLANN"<<endl;
+        pmids.clear();
+        for(auto pair : pmid2vec)
+          pmids.push_back(pair.first);
         runFlann(pmid2vec,pmids, OUTPUT_FILE);
     }else{
         lout << "SKIPPING FLANN" << endl;

@@ -6,6 +6,7 @@
 #include<string>
 #include<fstream>
 #include<sstream>
+#include<iostream>
 #include"Vec.h"
 
 using std::unordered_map;
@@ -22,6 +23,6 @@ public:
 
 	Dict(string file);
 	const Vec getVec(string word);
-        const bool contains(string word);
-
+  const bool contains(string word);
+  const int size(){return data.size();}
 };

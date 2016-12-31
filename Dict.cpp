@@ -17,7 +17,11 @@ Dict::Dict(string file) {
 			while (s >> d) {
 				vectorData.push_back(d);
 			}
-			data[word] = Vec(vectorData);
+      try{
+			  data[word] = Vec(vectorData);
+      }catch(...){
+        cerr << "Failed to load [" << word << "] into dict" << endl;
+      }
 		}
 	}
 	dataFile.close();
