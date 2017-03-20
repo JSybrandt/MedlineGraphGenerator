@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N bigflann
+#PBS -N topmine
 #PBS -l select=1:ncpus=24:mem=500gb,walltime=72:00:00
 #PBS -q bigmem
 #PBS -o /home/jsybran/job.out
@@ -13,9 +13,4 @@ export LD_LIBRARY_PATH=~/lib
 
 module load gcc openmpi/1.10.3
 
-rm $LOG_FILE
-touch $LOG_FILE
-
-#tail -f $LOG_FILE &
-/home/jsybran/projects/MedlineGraphGenerator/bin/medlineGraphGen
-
+topmine > /scratch2/jsybran/topmine_log.txt

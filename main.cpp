@@ -18,6 +18,7 @@
 #include"Vec.h"
 #include"Canonicalizer.h"
 #include "constants.h"
+#include<time.h>
 
 #include <flann/flann.hpp>
 using namespace std;
@@ -190,7 +191,7 @@ void runFlann(unordered_map<string,Vec>& pmid2vec, vector<string>& pmids, string
 
     flann::SearchParams params(128);
     params.cores = 0; //automatic core selection
-    index.knnSearch(data, indicies, dists, 10, params);
+    index.knnSearch(data, indicies, dists, 1000, params);
 
     fstream fout(outputFilePath,ios::out);
 
@@ -302,7 +303,9 @@ void catchChild(int sigNum){
 
 int main(int argc, char** argv) {
 
-  const int EXPECTED_SIZE = 30000000;
+  time_t startTime = time(0);
+
+    const int EXPECTED_SIZE = 30000000;
     signal(SIGCHLD, catchChild);
 
     fstream lout(LOG_FILE,ios::out);
@@ -386,8 +389,10 @@ int main(int argc, char** argv) {
         }
 
         lout<<"Building Dict"<<endl;
+        lout<<"Time:"<<difftime(time(0), startTime)<<endl;
         Dict dict(VECTOR_FILE);
         lout << "Loaded " << dict.size() << " words"<<endl;
+        lout<<"Time:"<<difftime(time(0), startTime)<<endl;
 
         lout<<"Getting vectors per abstract"<<endl;
 #pragma omp parallel for
@@ -411,6 +416,8 @@ int main(int argc, char** argv) {
 #pragma omp critical (SET_PMID_VEC)
             if(wordVecs.size() > 0) pmid2vec[pmid] = vec;
         }
+        lout <<"Got Vectors per Abstract" << endl;
+        lout<<"Time:"<<difftime(time(0), startTime) << endl;
 
         lout << "Saving Vecs" << endl;
 #pragma omp parallel
@@ -430,6 +437,7 @@ int main(int argc, char** argv) {
         fstream lvfOut(LOAD_ABSTRACT_VECTOR_FILE.c_str(),ios::out);
         lvfOut << "SAVED " << pmids.size() << " vectors"<<endl;
         lvfOut.close();
+        lout<<"Time:"<<difftime(time(0), startTime) << endl;
 
     } else {
 
@@ -468,6 +476,7 @@ int main(int argc, char** argv) {
 
     if(!ifstream(OUTPUT_FILE.c_str())){
         lout<<"Running FLANN"<<endl;
+        lout<<"Time:"<<difftime(time(0), startTime) << endl;
         pmids.clear();
         for(auto pair : pmid2vec)
           pmids.push_back(pair.first);
@@ -476,6 +485,7 @@ int main(int argc, char** argv) {
         lout << "SKIPPING FLANN" << endl;
     }
     lout << "DONE!" << endl;
+    lout<<"Time:"<<difftime(time(0), startTime) << endl;
 
     lout.close();
     return 0;
